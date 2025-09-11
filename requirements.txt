@@ -5,6 +5,7 @@ langchain-openai
 langchain-groq
 langchain-google-genai
 faiss-cpu
+numpy
 sentence-transformers
 torch
 python-dotenv

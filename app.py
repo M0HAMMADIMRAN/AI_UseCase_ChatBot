@@ -8,6 +8,15 @@ from utils.rag_utils import chunk_documents, build_index, query_index
 from utils.web_search import web_search
 from utils.prompt_templates import CONCISE_PROMPT, DETAILED_PROMPT
 
+import io
+try:
+    from PyPDF2 import PdfReader
+except Exception:
+    PdfReader = None
+try:
+    import docx
+except Exception:
+    docx = None
 # --------------------------------------------------
 # Human-like conversational prompt
 # --------------------------------------------------
@@ -70,19 +79,48 @@ def chat_page():
     # Upload & index documents
     with st.expander("Upload and Index Documents"):
         uploaded_files = st.file_uploader(
-            "Upload documents (txt, pdf, docx)", accept_multiple_files=True
+        "Upload documents (pdf, txt, docx). Text will be extracted and indexed.",
+        type=["pdf", "txt", "docx"],
+        accept_multiple_files=True
         )
         if uploaded_files:
             docs = []
             for f in uploaded_files:
+                fname = f.name.lower()
                 try:
-                    text = f.read().decode("utf-8", errors="ignore")
-                except Exception:
-                    text = f.name + " (binary file - not parsed)"
-                docs.append(text)
-            chunks = chunk_documents(docs)
-            build_index(chunks)
-            st.success("✅ Documents indexed!")
+                    data = f.read()  # bytes
+                    if fname.endswith(".pdf") and PdfReader is not None:
+                    # parse PDF
+                        reader = PdfReader(io.BytesIO(data))
+                        text = ""
+                        for p in reader.pages:
+                            t = p.extract_text()
+                            if t:
+                                text += t + "\n"
+                    elif fname.endswith(".docx") and docx is not None:
+                    # parse docx
+                        doc = docx.Document(io.BytesIO(data))
+                        text = "\n".join([para.text for para in doc.paragraphs])
+                    else:
+                    # treat as text file or unknown binary -> decode best-effort
+                        text = data.decode("utf-8", errors="ignore")
+                except Exception as e:
+                    st.warning(f"Could not parse {f.name}: {e}")
+                    try:
+                        text = data.decode("utf-8", errors="ignore")
+                    except Exception:
+                        text = ""
+                if text.strip():
+                    docs.append(text)
+            if docs:
+                try:
+                    chunks = chunk_documents(docs)
+                    build_index(chunks)
+                    st.success("✅ Documents processed and indexed.")
+                except Exception as e:
+                    st.error(f"Error indexing documents: {e}")
+            else:
+                st.warning("No parsable text found in the uploaded files.")
 
     # Select response mode
     mode = st.radio("Response Mode:", ["Concise", "Detailed", "Human-like"], horizontal=True)
