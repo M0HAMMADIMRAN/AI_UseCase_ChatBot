@@ -38,7 +38,7 @@ def get_chat_response(chat_model, messages, system_prompt):
 
 
 def instructions_page():
-    st.title("📘 The Chatbot Blueprint")
+    st.title("The Chatbot Blueprint")
     st.markdown(
         """
         - Upload documents (`txt`, `pdf`, `docx`) to build a knowledge base.  
@@ -51,7 +51,7 @@ def instructions_page():
 
 
 def chat_page():
-    st.title("🤖 AI ChatBot with RAG + Web Search")
+    st.title("AI ChatBot with RAG + Web Search")
 
     # initialize model
     chat_model = None
@@ -64,7 +64,7 @@ def chat_page():
         st.session_state.messages = []
 
     # ---- Document Upload & Indexing ----
-    with st.expander("📂 Upload and Index Documents"):
+    with st.expander("Upload and Index Documents"):
         uploaded_files = st.file_uploader(
             "Upload documents (pdf, txt, docx). Text will be extracted and indexed.",
             type=["pdf", "txt", "docx"],
@@ -101,7 +101,7 @@ def chat_page():
                 try:
                     chunks = chunk_documents(docs)
                     build_index(chunks)
-                    st.success("✅ Documents processed and indexed.")
+                    st.success("Documents processed and indexed.")
                 except Exception as e:
                     st.error(f"Error indexing documents: {e}")
             else:
@@ -145,7 +145,7 @@ def main():
     with st.sidebar:
         page = st.radio("Go to:", ["Chat", "Instructions"])
         if page == "Chat":
-            st.button("🗑️ Clear Chat History", on_click=lambda: st.session_state.pop("messages", None))
+            st.button("Clear Chat History", on_click=lambda: st.session_state.pop("messages", None))
 
     if page == "Instructions":
         instructions_page()
