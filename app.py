@@ -41,19 +41,20 @@ def get_chat_response(chat_model, messages, system_prompt):
 
 
 def instructions_page():
-    st.title("📘 The Chatbot Blueprint")
+    st.title("The Chatbot Blueprint")
     st.markdown(
         """
         - Upload documents (`txt`, `pdf`, `docx`) to build a knowledge base.  
         - Ask questions in natural language.  
         - If the answer isn’t in your docs → it will search the web using SerpAPI.  
-        - Choose between **Concise** or **Detailed** answer modes.
+        - Choose between **Concise** or **Detailed** answer modes.  
+        - Use sidebar to clear chat, save chat, or start new chat.  
         """
     )
 
 
 def chat_page():
-    st.title("🤖 AI ChatBot with RAG + Web Search")
+    st.title("AI ChatBot with RAG + Web Search")
 
     # Initialize model (may be None if API key missing)
     chat_model = None
@@ -62,12 +63,14 @@ def chat_page():
     except Exception as e:
         st.warning(f"Model init warning: {e}")
 
-    # session messages
+    # session state for messages and saved chats
     if "messages" not in st.session_state:
         st.session_state.messages = []
+    if "saved_chats" not in st.session_state:
+        st.session_state.saved_chats = []
 
     # Upload & index
-    with st.expander("📂 Upload and Index Documents"):
+    with st.expander("Upload and Index Documents"):
         uploaded_files = st.file_uploader(
             "Upload documents (pdf, txt, docx). Text will be extracted and indexed.",
             type=["pdf", "txt", "docx"],
@@ -104,7 +107,7 @@ def chat_page():
                 try:
                     chunks = chunk_documents(docs)
                     build_index(chunks)
-                    st.success("✅ Documents processed and indexed.")
+                    st.success("Documents processed and indexed.")
                 except Exception as e:
                     st.error(f"Error indexing documents: {e}")
             else:
@@ -133,10 +136,15 @@ def chat_page():
                     search_results = web_search(prompt)
                     context = "\n\n".join(search_results) if search_results else ""
 
+                # Add human-like small talk capability
                 system_prompt = (
-                    (CONCISE_PROMPT if mode == "Concise" else DETAILED_PROMPT)
+                    "You are a friendly and helpful AI assistant. "
+                    "You should be able to handle small talk (e.g., greetings, chit-chat) "
+                    "in a natural, human-like way. "
+                    + (CONCISE_PROMPT if mode == "Concise" else DETAILED_PROMPT)
                     + "\n\nContext:\n" + context
                 )
+
                 response = get_chat_response(chat_model, st.session_state.messages, system_prompt)
                 st.markdown(response)
 
@@ -147,8 +155,22 @@ def main():
     st.set_page_config(page_title="LangChain Multi-Provider ChatBot", layout="wide")
     with st.sidebar:
         page = st.radio("Go to:", ["Chat", "Instructions"])
+
         if page == "Chat":
-            st.button("🗑️ Clear Chat History", on_click=lambda: st.session_state.pop("messages", None))
+            if st.button("Clear Chat History"):
+                st.session_state.pop("messages", None)
+            if st.button("Save Current Chat"):
+                st.session_state.saved_chats.append(list(st.session_state.messages))
+                st.success("Chat saved!")
+            if st.button("New Chat"):
+                st.session_state.messages = []
+                st.info("Started a new chat.")
+
+            if st.session_state.get("saved_chats"):
+                st.markdown("### Saved Chats")
+                for i, chat in enumerate(st.session_state.saved_chats):
+                    if st.button(f"Load Chat {i+1}"):
+                        st.session_state.messages = list(chat)
 
     if page == "Instructions":
         instructions_page()
