@@ -10,7 +10,7 @@ from utils.rag_utils import chunk_documents, build_index, query_index
 from utils.web_search import web_search
 from utils.prompt_templates import CONCISE_PROMPT, DETAILED_PROMPT
 
-# optional imports for doc parsing
+# doc parsing
 try:
     from PyPDF2 import PdfReader
 except Exception:
@@ -22,7 +22,10 @@ except Exception:
 
 
 def get_chat_response(chat_model, messages, system_prompt):
-    """Send formatted conversation history to the LLM and get a response."""
+    """Return a response string. If model is not initialized, return a helpful message."""
+    if chat_model is None:
+        return "Model not initialized. Please set GROQ_API_KEY in .env or Streamlit secrets."
+
     try:
         from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
         formatted_messages = [SystemMessage(content=system_prompt)]
@@ -32,39 +35,39 @@ def get_chat_response(chat_model, messages, system_prompt):
             else:
                 formatted_messages.append(AIMessage(content=msg["content"]))
         response = chat_model.invoke(formatted_messages)
-        return response.content
+        return response.content if hasattr(response, "content") else str(response)
     except Exception as e:
         return f"Error getting response: {str(e)}"
 
 
 def instructions_page():
-    st.title("The Chatbot Blueprint")
+    st.title("📘 The Chatbot Blueprint")
     st.markdown(
         """
         - Upload documents (`txt`, `pdf`, `docx`) to build a knowledge base.  
         - Ask questions in natural language.  
         - If the answer isn’t in your docs → it will search the web using SerpAPI.  
-        - Choose between **Concise** or **Detailed** answer modes.  
-        - Clear or save chats anytime using the sidebar.  
+        - Choose between **Concise** or **Detailed** answer modes.
         """
     )
 
 
 def chat_page():
-    st.title("AI ChatBot with RAG + Web Search")
+    st.title("🤖 AI ChatBot with RAG + Web Search")
 
-    # initialize model
+    # Initialize model (may be None if API key missing)
     chat_model = None
     try:
         chat_model = get_chatgroq_model()
     except Exception as e:
-        st.warning(f"⚠️ Model init warning: {e}")
+        st.warning(f"Model init warning: {e}")
 
+    # session messages
     if "messages" not in st.session_state:
         st.session_state.messages = []
 
-    # ---- Document Upload & Indexing ----
-    with st.expander("Upload and Index Documents"):
+    # Upload & index
+    with st.expander("📂 Upload and Index Documents"):
         uploaded_files = st.file_uploader(
             "Upload documents (pdf, txt, docx). Text will be extracted and indexed.",
             type=["pdf", "txt", "docx"],
@@ -101,21 +104,21 @@ def chat_page():
                 try:
                     chunks = chunk_documents(docs)
                     build_index(chunks)
-                    st.success("Documents processed and indexed.")
+                    st.success("✅ Documents processed and indexed.")
                 except Exception as e:
                     st.error(f"Error indexing documents: {e}")
             else:
                 st.warning("No parsable text found in the uploaded files.")
 
-    # ---- Mode Selection ----
+    # Mode selection
     mode = st.radio("Response Mode:", ["Concise", "Detailed"], horizontal=True)
 
-    # ---- Display Chat History ----
+    # Display messages
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
-    # ---- User Input ----
+    # Input and response
     if prompt := st.chat_input("Type your message here..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
@@ -128,7 +131,7 @@ def chat_page():
                     context = "\n\n".join(retrieved)
                 else:
                     search_results = web_search(prompt)
-                    context = "\n\n".join(search_results)
+                    context = "\n\n".join(search_results) if search_results else ""
 
                 system_prompt = (
                     (CONCISE_PROMPT if mode == "Concise" else DETAILED_PROMPT)
@@ -145,7 +148,7 @@ def main():
     with st.sidebar:
         page = st.radio("Go to:", ["Chat", "Instructions"])
         if page == "Chat":
-            st.button("Clear Chat History", on_click=lambda: st.session_state.pop("messages", None))
+            st.button("🗑️ Clear Chat History", on_click=lambda: st.session_state.pop("messages", None))
 
     if page == "Instructions":
         instructions_page()

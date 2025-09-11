@@ -1,7 +1,6 @@
 streamlit
 langchain
 langchain-core
-langchain-community
 langchain-groq
 sentence-transformers
 torch
