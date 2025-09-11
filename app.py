@@ -1,6 +1,5 @@
 import streamlit as st
 import os, sys
-# ensure project root imports work
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '.')))
 
 from config import config  # loads .env
@@ -9,6 +8,20 @@ from utils.rag_utils import chunk_documents, build_index, query_index
 from utils.web_search import web_search
 from utils.prompt_templates import CONCISE_PROMPT, DETAILED_PROMPT
 
+# --------------------------------------------------
+# Human-like conversational prompt
+# --------------------------------------------------
+HUMAN_PROMPT = """
+You are a friendly and helpful AI assistant. 
+- If the user is having a casual chat (greetings, feelings, opinions), respond naturally like a human.
+- If the user asks about knowledge (documents, facts, web), use the context provided and give a clear, helpful answer.
+- Always keep your tone conversational and engaging.
+- If unsure, politely say so instead of hallucinating.
+"""
+
+# --------------------------------------------------
+# Helper function to get model response
+# --------------------------------------------------
 def get_chat_response(chat_model, messages, system_prompt):
     try:
         from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
@@ -19,35 +32,51 @@ def get_chat_response(chat_model, messages, system_prompt):
             else:
                 formatted_messages.append(AIMessage(content=msg["content"]))
         response = chat_model.invoke(formatted_messages)
-        return response.content
+        return response.content if hasattr(response, "content") else str(response)
     except Exception as e:
         return f"Error getting response: {str(e)}"
 
-def instructions_page():
-    st.title("The Chatbot Blueprint")
-    st.markdown("Follow the instructions in README.md and add API keys in `.env` or Streamlit secrets.")
-
+# --------------------------------------------------
+# Main chat page
+# --------------------------------------------------
 def chat_page():
     st.title("🤖 AI ChatBot with RAG + Web Search")
 
+    # Initialize Groq model
     chat_model = None
     try:
         chat_model = get_chatgroq_model()
     except Exception as e:
         st.warning(f"Model init warning: {e}")
 
+    # Initialize state
     if "messages" not in st.session_state:
         st.session_state.messages = []
+    if "saved_chats" not in st.session_state:
+        st.session_state.saved_chats = []
+
+    # Sidebar for managing chats
+    st.sidebar.header("Chat Sessions")
+    if st.sidebar.button("🆕 New Chat"):
+        st.session_state.messages = []
+    if st.sidebar.button("💾 Save Chat"):
+        if st.session_state.messages:
+            st.session_state.saved_chats.append(st.session_state.messages.copy())
+            st.session_state.messages = []
+    for i, chat in enumerate(st.session_state.saved_chats):
+        if st.sidebar.button(f"Chat {i+1}"):
+            st.session_state.messages = chat.copy()
 
     # Upload & index documents
     with st.expander("📂 Upload and Index Documents"):
-        uploaded_files = st.file_uploader("Upload documents (txt, pdf, docx) — text will be read as plain text", accept_multiple_files=True)
+        uploaded_files = st.file_uploader(
+            "Upload documents (txt, pdf, docx)", accept_multiple_files=True
+        )
         if uploaded_files:
             docs = []
             for f in uploaded_files:
                 try:
-                    bytes_data = f.read()
-                    text = bytes_data.decode("utf-8", errors="ignore")
+                    text = f.read().decode("utf-8", errors="ignore")
                 except Exception:
                     text = f.name + " (binary file - not parsed)"
                 docs.append(text)
@@ -55,32 +84,56 @@ def chat_page():
             build_index(chunks)
             st.success("✅ Documents indexed!")
 
-    mode = st.radio("Response Mode:", ["Concise", "Detailed"], horizontal=True)
+    # Select response mode
+    mode = st.radio("Response Mode:", ["Concise", "Detailed", "Human-like"], horizontal=True)
 
+    # Display existing chat history
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
+    # Chat input
     if prompt := st.chat_input("Type your message here..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
             st.markdown(prompt)
+
         with st.chat_message("assistant"):
             with st.spinner("Thinking..."):
+                # RAG / Web search context
                 retrieved = query_index(prompt)
                 if retrieved:
                     context = "\n\n".join(retrieved)
                 else:
                     search_results = web_search(prompt)
-                    context = "\n\n".join(search_results)
+                    context = "\n\n".join(search_results) if search_results else ""
 
-                system_prompt = (CONCISE_PROMPT if mode=="Concise" else DETAILED_PROMPT) + "\n\nContext:\n" + context
+                # Choose system prompt
+                if mode == "Concise":
+                    system_prompt = CONCISE_PROMPT + "\n\nContext:\n" + context
+                elif mode == "Detailed":
+                    system_prompt = DETAILED_PROMPT + "\n\nContext:\n" + context
+                else:  # Human-like
+                    system_prompt = HUMAN_PROMPT + "\n\nContext:\n" + context
+
+                # Get response
                 response = get_chat_response(chat_model, st.session_state.messages, system_prompt)
                 st.markdown(response)
+
         st.session_state.messages.append({"role": "assistant", "content": response})
 
+# --------------------------------------------------
+# Instructions page
+# --------------------------------------------------
+def instructions_page():
+    st.title("📖 The Chatbot Blueprint")
+    st.markdown("Follow the instructions in README.md and add API keys in `.env` or Streamlit secrets.")
+
+# --------------------------------------------------
+# Main entry
+# --------------------------------------------------
 def main():
-    st.set_page_config(page_title="LangChain Multi-Provider ChatBot", layout="wide")
+    st.set_page_config(page_title="NeoStats AI Chatbot", layout="wide")
     with st.sidebar:
         page = st.radio("Go to:", ["Chat", "Instructions"])
         if page == "Chat":
