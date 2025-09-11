@@ -40,7 +40,7 @@ def get_chat_response(chat_model, messages, system_prompt):
 # Main chat page
 # --------------------------------------------------
 def chat_page():
-    st.title("🤖 AI ChatBot with RAG + Web Search")
+    st.title("AI ChatBot with RAG + Web Search")
 
     # Initialize Groq model
     chat_model = None
@@ -57,9 +57,9 @@ def chat_page():
 
     # Sidebar for managing chats
     st.sidebar.header("Chat Sessions")
-    if st.sidebar.button("🆕 New Chat"):
+    if st.sidebar.button("New Chat"):
         st.session_state.messages = []
-    if st.sidebar.button("💾 Save Chat"):
+    if st.sidebar.button("Save Chat"):
         if st.session_state.messages:
             st.session_state.saved_chats.append(st.session_state.messages.copy())
             st.session_state.messages = []
@@ -68,7 +68,7 @@ def chat_page():
             st.session_state.messages = chat.copy()
 
     # Upload & index documents
-    with st.expander("📂 Upload and Index Documents"):
+    with st.expander("Upload and Index Documents"):
         uploaded_files = st.file_uploader(
             "Upload documents (txt, pdf, docx)", accept_multiple_files=True
         )
@@ -126,18 +126,18 @@ def chat_page():
 # Instructions page
 # --------------------------------------------------
 def instructions_page():
-    st.title("📖 The Chatbot Blueprint")
-    st.markdown("Follow the instructions in README.md and add API keys in `.env` or Streamlit secrets.")
+    st.title("The Chatbot Blueprint")
+    st.markdown("Follow the instructions in README.md or Streamlit secrets.")
 
 # --------------------------------------------------
 # Main entry
 # --------------------------------------------------
 def main():
-    st.set_page_config(page_title="NeoStats AI Chatbot", layout="wide")
+    st.set_page_config(page_title="AI Chatbot", layout="wide")
     with st.sidebar:
         page = st.radio("Go to:", ["Chat", "Instructions"])
         if page == "Chat":
-            st.button("🗑️ Clear Chat History", on_click=lambda: st.session_state.pop("messages", None))
+            st.button("Clear Chat History", on_click=lambda: st.session_state.pop("messages", None))
 
     if page == "Instructions":
         instructions_page()
